@@ -1,16 +1,13 @@
-import uf
-import usdclp
+import bco_central
 
-for anio in range(1990,2023):
+for anio in range(1994,2023):
     print(anio)
-    usdclp.scrap(anio)
+    bco_central.scrap('CADCLP',anio)
 
-anio = 2002
-uf.scrap(anio)
+anio = 2000
+serie = 'BRLCLP'
+bco_central.scrap(serie,anio)
 
 #tabla = "dfischer.valor_serie"
 #con = db_geekosas("dfischer")
 
-
-a = [1,2,3,4,5,6,7]
-a[:-1]
