@@ -31,38 +31,42 @@ def db_geekosas(db="dfischer"):
   return con
 
 def upsert(con,tabla,dataset,key):
-  temp_table = "upsert_" + get_random_word(30)
-  con.execute("create temporary table {} select * from {} limit 0".format(temp_table,tabla))
-  dataset.to_sql(temp_table,con,if_exists='append',index=False)
+  try:
+    temp_table = "upsert_" + get_random_word(30)
+    con.execute("create table {} select * from {} limit 0".format(temp_table,tabla))
+    dataset.to_sql(temp_table,con,if_exists='append',index=False)
 
-  if(isinstance(key, str)):
-    key = key.split(',')
-  
-  where = ['t.{0} = tmp.{0}'.format(k) for k in key]
-  where = ' and '.join(where)
-  
-  values = pd.read_sql("select * from {} limit 0".format(tabla),con).columns
-  values =  [v for v in values if v not in key]
-  update = ['t.{0} = tmp.{0}'.format(v) for v in values]
-  update = ", ".join(update)
-  
+    if(isinstance(key, str)):
+      key = key.split(',')
+    
+    where = ['t.{0} = tmp.{0}'.format(k) for k in key]
+    where = ' and '.join(where)
+    
+    values = pd.read_sql("select * from {} limit 0".format(tabla),con).columns
+    values =  [v for v in values if v not in key]
+    update = ['t.{0} = tmp.{0}'.format(v) for v in values]
+    update = ", ".join(update)
+    
 
-  #update
-  sql_execute_query(con,"""
-                      update {tabla} t
-                      inner join {temp_table} tmp
-                      on {where}
-                      set {update}""".format(tabla = tabla,temp_table = temp_table , where = where, update = update))
-  #insert
-  sql_execute_query(con,"""insert into {tabla} 
-                            select tmp.* from {temp_table} tmp
-                            left join {tabla} t
-                            on {where}
-                            where t.{key} is null""".format(tabla = tabla, temp_table = temp_table, where = where, key = key[0]))
+    #update
+    sql_execute_query(con,"""
+                        update {tabla} t
+                        inner join {temp_table} tmp
+                        on {where}
+                        set {update}""".format(tabla = tabla,temp_table = temp_table , where = where, update = update))
+    #insert
+    sql_execute_query(con,"""insert into {tabla} 
+                              select tmp.* from {temp_table} tmp
+                              left join {tabla} t
+                              on {where}
+                              where t.{key} is null""".format(tabla = tabla, temp_table = temp_table, where = where, key = key[0]))
 
-
-  con.execute("""drop table {}""".format(temp_table))
-  return True
+    con.execute("""drop table {}""".format(temp_table))
+    #sql_execute_query(con,"""drop table {}""".format(temp_table))
+    return True
+  except:
+    con.execute("""drop table {}""".format(temp_table))
+    return False
 
 def set_value(id_serie,fecha, valor,con):
   hora = datetime.datetime.now()
@@ -77,7 +81,7 @@ def set_value(id_serie,fecha, valor,con):
   query_update = "update dfischer.valor_serie set valor = '{}', updated = '{}' where id_serie = {} and fecha = '{}'".format(valor,hora,id_serie,fecha)
   con.execute(query_update)
 
-  return
+  return True
 
 def sql_execute_query(con,query, retry_count = 0, max_retry = 0):
   from sqlalchemy.orm import sessionmaker
@@ -89,10 +93,9 @@ def sql_execute_query(con,query, retry_count = 0, max_retry = 0):
   except Exception as e:
     if (retry_count < max_retry):
       retry_count = retry_count + 1
-      print("retry bulk insert n {}".format(retry_count))
+      print("retry {}".format(retry_count))
       sql_execute_query(con,query, retry_count = retry_count, max_retry = max_retry)
     else:
       raise Exception(str(e))
-  
   session.close()
 
